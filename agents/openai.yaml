@@ -1,0 +1,6 @@
+interface:
+  display_name: "Dependabot Review & Merge"
+  short_description: "Review and sequentially merge safe Dependabot PRs"
+
+policy:
+  allow_implicit_invocation: false
