@@ -3,7 +3,6 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: cron
-      cronjob: "0 0 1 1,4,7,10 *"
+      interval: quarterly
     cooldown:
       default-days: 14
