@@ -36,7 +36,7 @@ Numbers combined with conditions:
 $dependabot-review-merge Review PRs #42, #57 and #63 in OWNER/REPO. Merge only Patch updates to pytest under /tools with passing CI, in the listed order.
 ```
 
-By default, numbered PRs restrict the candidates and conditions filter those candidates. State a union explicitly if that is intended. Conditions can combine package names, Major/Minor/Patch levels, ecosystems, directories, labels and CI status. They are checked against actual updates, not just titles. A group with any update outside the conditions is excluded as a whole. Passing CI as a selection condition is not safety approval.
+By default, numbered PRs restrict the candidates and conditions filter those candidates. State a union explicitly if that is intended. Conditions can combine package names, Major/Minor/Patch levels, ecosystems, directories, labels and CI status. Dependency conditions apply to Dependabot's intended update targets, whether direct or transitive, rather than incidental transitive changes. A group with any update target outside the conditions is excluded as a whole. All incidental changes still undergo safety review; ambiguity about which dependencies are targeted stops the run if it affects scope. Passing CI as a selection condition is not safety approval.
 
 A narrower request such as “review only; do not merge” is respected.
 
@@ -71,8 +71,13 @@ Do not overwrite an existing checkout, file or link. The `ln` command intentiona
 SKILL.md             Review, selection, merge and reconciliation instructions
 agents/openai.yaml   UI metadata and explicit-invocation policy
 README.md            Usage and installation
+LICENSE              MIT License
 ```
 
 No scripts or test framework are required. Skill validation and offline scenario checks do not review or mutate live Dependabot PRs.
 
 The format, user skills location, symlink discovery and invocation policy follow the [official Codex Skill documentation](https://learn.chatgpt.com/docs/build-skills).
+
+## License
+
+[MIT License](LICENSE). Copyright (c) 2026 SnowCait.
