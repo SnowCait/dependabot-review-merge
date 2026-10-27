@@ -40,4 +40,4 @@ PR numbers and filtering conditions can also be combined.
 
 If no repository is specified, the current Git repository is used. If no PR selection is specified, all open Dependabot PRs are selected.
 
-The skill stops if an update cannot be safely merged.
+When a PR-specific issue prevents safe merging, the skill skips that PR and continues with independent later PRs whose safety can be verified. It stops the run for issues affecting the entire process, such as authentication or permissions.
