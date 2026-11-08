@@ -7,7 +7,7 @@ description: Review selected Dependabot dependency-update PRs and merge verified
 
 Review real dependency changes before merging, one PR at a time. Respect a narrower user request, including review-only mode: never submit an approval in that mode. A merge request authorizes a necessary approval only under section 3 after safety review. Explicit invocation does not authorize edits to repository settings, PR branches, labels, or unrelated PRs. Do not post standalone comments, trigger Dependabot commands, or repair updates unless separately requested.
 
-Use authenticated GitHub CLI or an equivalent connector that supports the required reads and atomic HEAD checks. Try available read sources before concluding access is insufficient; do not require `Administration: read` merely to inspect protections. Stop if access remains insufficient to verify the required conditions. If scope or permission clarification is needed, stop all run work until the user answers. Preserve the user's checkout; use an isolated temporary clone/worktree when local inspection or validation is needed. Read applicable `AGENTS.md` and project development guidance. Keep commands and PR processing sequential. Apply the continuation policy below to failures throughout the workflow.
+Use authenticated GitHub CLI or an equivalent connector that supports the required reads and atomic HEAD checks. Try available read sources before concluding access is insufficient; do not require `Administration: read` merely to inspect protections. Stop if access remains insufficient to verify the required conditions. If clarification is needed to establish run-wide scope or permissions, stop all run work until the user answers. Preserve the user's checkout; use an isolated temporary clone/worktree when local inspection or validation is needed. Read applicable `AGENTS.md` and project development guidance. Keep commands and PR processing sequential. Apply the continuation policy below to failures throughout the workflow.
 
 ## 1. Freeze the selection
 
@@ -23,10 +23,10 @@ Resolve the GitHub repository from the user, PR URLs, or the current Git reposit
 Create a run ledger outside the repository and announce the selected set and order. Selection is not a safety approval. For each logical target record:
 
 - Original/current PR URL, number and node ID, Dependabot author, base branch, HEAD/base SHAs, labels and selection evidence.
-- Ecosystem, manifest/lockfile paths, Dependabot update-target identities, old/new versions or requirements, and group identity/target set. Keep incidental changes separately as safety-review evidence.
+- Package identities, ecosystem, update directories, manifest/lockfile paths, and group identity/target set. Record initial and current old/new versions or requirements, the original selection predicates, and any user-specified target versions/requirements. Keep incidental changes separately as safety-review evidence.
 - PR lineage, review evidence, reviewed HEAD SHA, checks, and processing status.
 
-Freeze these logical targets at run start. Honor user ordering; otherwise choose and explain an order based on dependency relationships and overlap, with stable tie-breaking. Newly opened unrelated PRs are never added. A proven regenerated successor of a frozen target can replace its PR number in the ledger.
+Freeze the logical update targets at run start by package, ecosystem, directories and group target composition. Versions/requirements are recorded evidence, not fixed scope, unless the user explicitly specified them; preserve those constraints. Honor user ordering; otherwise choose and explain an order based on dependency relationships and overlap, with stable tie-breaking. Newly discovered unrelated targets or PRs are never added. A proven regenerated successor of a frozen target can replace its PR number in the ledger, subject to section 4.
 
 ## 2. Review each selected update
 
@@ -42,7 +42,7 @@ Review the current HEAD against the current base and record the evidence:
 
 Never infer safety from green CI or a Patch/Minor label alone. Run only validation needed for this update. Do not add tests of the dependency library itself or silently fix a failing PR. Skip a PR with a regression, compatibility problem, failed check, unrelated change, or inability to establish its safety; do not approve or merge it. Before processing later targets, assess dependencies on and effects of skipped updates against the actual base. Skip any affected target whose safety cannot be established independently.
 
-Keep safety conclusions tied to the reviewed HEAD/base and diff, not just the PR number. A changed HEAD, diff, or relevant base integration invalidates that conclusion and needs a fresh review, including changed incidental transitive dependencies. Reapply the frozen selection predicates to Dependabot's targets in changed/regenerated PRs. At any point, changed target versions/requirements, group target membership or directories need a scope stop unless they only reflect proven incorporation of part of the frozen update. Matching the original filters alone does not authorize a newer target release.
+Keep safety conclusions tied to the reviewed HEAD/base and diff, not just the PR number. A changed HEAD, diff, or relevant base integration invalidates that conclusion and needs a fresh review, including changed incidental transitive dependencies. At every refresh, reconcile target identity and composition under section 4. A version/requirements change alone does not stop the run: reapply the original selection predicates to the current update. Skip the logical target (the whole PR for a group) if it no longer qualifies, such as a Patch-only selection becoming Minor. If it departs from an explicit user-specified version/requirements constraint, skip it as requiring user reconfirmation; do not automatically authorize the change. An eligible changed update still requires safety review of its actual current contents before approval or merge.
 
 ## 3. Merge the reviewed revision
 
@@ -80,18 +80,24 @@ For either path, confirm whether the PR actually merged before processing anothe
 After each confirmed merge, wait **120 seconds**, then refresh all remaining unprocessed frozen targets against the updated base. Use interruptible waits (for example, two 60-second waits) and keep progress visible.
 
 - Existing PR rebased: discard the old review and review the latest diff/HEAD before merging.
-- Different PR number: find a unique successor using Dependabot update-target identities, ecosystem, directories, target versions/requirements, group target membership and Dependabot's closure/replacement metadata. Numbers/titles alone are insufficient. Record the lineage and review the successor from scratch.
+- Different PR number: prove a unique successor using package identities, ecosystem, directories, group identity/target membership and Dependabot's closure/replacement metadata, corroborated by manifests/lockfiles and diffs. Numbers/titles alone are insufficient; matching target versions/requirements is not required. Record the lineage and review the successor from scratch, reapplying section 2 if versions/requirements changed.
 - Already incorporated: prove the intended update is present on the target branch from manifests/lockfiles and commit/diff evidence; mark it incorporated and do not merge a duplicate. A closed PR alone is not such proof.
 - Still working: use evidence including `Dependabot is rebasing this PR`, current bot activity, or replacement metadata. Recheck at **120-second intervals** while work continues; do not review a transient revision as final.
 - No successor after the initial 120-second wait and no work-in-progress evidence: if the closure/disappearance is understood, record **not regenerated in this run** and report it as unprocessed. This does not predict future regeneration. If the lineage/state is ambiguous, stop rather than guessing.
 
-Inspect newly created PRs only to find successors of frozen targets. Do not absorb a newer target release, an expanded set of Dependabot update targets, changed target directories, or another unrelated update into the run. Explain any replacement that no longer satisfies the original predicates and stop on an unexpected scope change.
+Apply these scope rules whenever targets are refreshed, including before a merge:
+
+- A group member disappeared: prove its intended update is incorporated into the base branch using the evidence above. Only then may the remaining frozen members proceed; otherwise skip the whole grouped PR.
+- A group gained a new update target or update directories changed: skip the whole PR; do not expand the frozen scope.
+- Target identity or successor lineage cannot be proved: stop the entire run rather than guessing.
+
+Inspect newly created PRs only to find successors of frozen targets. Never add unrelated new PRs. Apply section 2 to changed versions/requirements and selection predicates, and the continuation policy to PR-specific scope violations.
 
 Use a user-specified waiting budget. Otherwise allow at most 20 minutes per logical target for each of CI, merge-queue and Dependabot waiting, checking every 120 seconds. Each clock starts at the first pending observation for that category (queue acceptance for queue waiting); state changes, retries and regenerated PR numbers do not reset it. At expiry, report the pending state and skip that target, subject to queue cleanup and the continuation policy. An active rebase at the deadline is pending, not proof that regeneration will never occur.
 
 ## Continuation and reporting
 
-Skip PR-specific safety failures and unmet merge conditions, record the reason, and continue with the next frozen target only when it can be reviewed safely and independently. A skip ends processing of that logical target for this run; do not automatically retry it after later merges. Never approve or merge a PR while its safety or required conditions remain unverified.
+Skip PR-specific safety failures, unmet merge conditions and scope violations, record the reason, and continue with the next frozen target only when the issue is confirmed to be confined to that PR and later targets can be reviewed safely and independently. A skip ends processing of that logical target (all remaining members for a grouped PR) for this run; do not automatically retry it after later merges. Never approve or merge a PR while its safety or required conditions remain unverified.
 
 Stop the entire run for authentication or permission problems, ambiguous selection or scope/lineage, unverifiable repository rules or merge policy, unavailable revision guards, unresolved mutation outcomes, or inability to control or confirm queue cleanup. If the effect on the safety of the overall workflow is unclear, stop rather than treating the problem as PR-specific. A skip never overrides a required reconciliation or the 120-second wait after a confirmed merge.
 
